@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NTS - Vlastní systém pro vyzvednutí objednávek z AlzaBoxů</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center justify-start p-4">
+
+    <!-- Načítací animace -->
+    <div id="loading-screen" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 max-w-lg mb-8 leading-snug">
+            New Technology Software - Osobní systém pro vyzvednutí objednávek z AlzaBoxů
+        </h1>
+        <div class="inline-block animate-spin rounded-full h-14 w-14 border-4 border-emerald-500 border-t-transparent"></div>
+        <p class="text-sm text-gray-500 mt-4">Načítání systému...</p>
+    </div>
+
+    <!-- Hlavní kontejner -->
+    <div id="main-content" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 my-4 border border-gray-100 hidden">
+        <header class="text-center mb-6">
+            <h2 class="text-lg font-bold text-gray-900">NTS - Vlastní systém pro vyzvednutí objednávek z AlzaBoxů</h2>
+        </header>
+
+        <hr class="border-gray-200 mb-4">
+
+        <!-- Detaily objednávky -->
+        <div class="mb-4">
+            <h3 class="text-sm font-semibold text-emerald-600 mb-2">Objednávka: 1062 477 926</h3>
+            <div class="space-y-2 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p><strong>Vlastní popis:</strong> Nový ventilátor chladiče LE2563 (při zapojení stačí jen napájení z chladiče), + kabel z el. zásuvky do PC zdroje VeinX.</p>
+                <p><strong>Počet kusů v objednávce:</strong> 2</p>
+                <p><strong>Cena:</strong> 125 Kč (platba kartou u AlzaBoxu)</p>
+                <p><strong>Dopravce:</strong> Alza Express</p>
+                <p><strong>Způsob doručení:</strong> Do AlzaBoxu Bolelouc 551, 78375 - Dub nad Moravou</p>
+		<p><strong>Funkce AlzaBoxu:</strong> ✅Dostupný 24/7, ✅Moderní AlzaBox s dotykovou obrazovkou a klávesnicí, ✅Platební terminál na boxu</p>
+		<p><strong>Do půlnoci objednáš, ráno v AlzaBoxu máš:</strong> ✔️Objednávka byla provedena 12.10. do 23:59. Bude doručena v režimu "Do půlnoci objednáš, ráno v AlzaBoxu máš". <strong>Očekávaný termín doručení: 13.10. do 12:00</strong>
+            </div>
+        </div>
+
+        <hr class="border-gray-200 my-4">
+
+        <!-- Stav zásilky -->
+        <div>
+            <h3 class="text-md font-bold text-gray-900 mb-4">Stav zásilky a výdej zásilky</h3>
+            <div id="timeline-container" class="relative pl-4 space-y-6">
+                <!-- Dynamicky generované stavy -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modální okno: Zahájit výdej -->
+    <div id="modal-start-pickup" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <h3 class="text-lg font-bold text-gray-900 mb-3">Zahájit výdej objednávky?</h3>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                <strong>Výdej objednávky je nutné zahájit až fyzicky u AlzaBoxu!</strong> Při pokračování se může AlzaBox automaticky otevřít nebo bude vygenerován kód pro otevření, který má platnost 5 minut. Jde o bezpečnostní nastavení Alzy, které nelze změnit. Opravdu zahájit výdej?
+            </p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-pickup" class="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2.5 rounded-xl hover:bg-gray-50 transition">Zrušit</button>
+                <button id="btn-confirm-pickup" class="flex-1 bg-emerald-600 text-white font-medium py-2.5 rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20">Zahájit výdej</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modální okno: Volba metody -->
+    <div id="modal-method" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <img src="logo.png" alt="Logo" class="h-12 mx-auto mb-4 object-contain" onerror="this.style.display='none'">
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                AlzaBox disponuje dotykovou obrazovkou s klávesnicí. Objednávku je možné vyzvednout oběma způsoby: Pomocí mobilní aplikace Alza.cz i pomocí zadání kódu na AlzaBoxu.
+            </p>
+            <div class="space-y-3">
+                <button id="btn-use-app" class="w-full bg-orange-500 text-white font-medium py-3 rounded-xl hover:bg-orange-600 transition shadow-lg shadow-orange-500/20">Použít aplikaci</button>
+                <p id="app-warning" class="text-xs font-bold text-red-600 hidden">Nejprve je nutné si nainstalovat aplikaci Alza.cz do tohoto telefonu a přihlásit se účtem adamrudolfsky!</p>
+                <button id="btn-use-code" class="w-full bg-emerald-600 text-white font-medium py-3 rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20">Výdej s kódem</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modální okno: Zobrazit kód -->
+    <div id="modal-show-code-prompt" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <h3 class="text-lg font-bold text-gray-900 mb-3">Zobrazit kód?</h3>
+            <p class="text-xs text-gray-600 mb-6 leading-relaxed text-left bg-gray-50 p-3 rounded-xl border border-gray-100">
+                Poznámka: Pokud tento box nesvítí (obrazovka je černá), je nutné na ni nyní kliknout, aby se box spustil. | Varování: Kód má platnost 5 minut. Je nutné být přímo u AlzaBoxu. Do té doby je potřeba jej zadat na displeji AlzaBoxu. Zvolený AlzaBox má dotykovou obrazovku s číselnou klávesnicí. Obrazovka se nachází zhruba uprostřed AlzaBoxu. V dalším kroku bude zobrazen šesti místný číselný kód. Ten je potřeba přepsat do AlzaBoxu.
+            </p>
+            <button id="btn-generate-code-final" class="w-full bg-orange-500 text-white font-medium py-3 rounded-xl hover:bg-orange-600 transition shadow-lg shadow-orange-500/20">Vygenerovat kód</button>
+        </div>
+    </div>
+
+    <!-- Modální okno: Sekvenční načítání -->
+    <div id="modal-loading-sequence" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl text-center">
+            <h3 id="sequence-title" class="text-lg font-bold text-gray-900 mb-6">Připojuji se k AlzaBoxu…</h3>
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
+        </div>
+    </div>
+
+    <!-- Modální okno: Vyzvednutí (po 20s) -->
+    <div id="modal-pickup-alert" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <h3 class="text-lg font-bold text-gray-900 mb-3">Vyzvednutí:</h3>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed text-left bg-gray-50 p-3 rounded-xl border border-gray-100">
+                Právě byla otevřena příslušná schránka AlzaBoxu. Nachází se v ní tento počet balíků: 2. Při vyzvednutí se ujistit, zda byly vyzvednuty 2 balíky. Poté schránku zavřít. Pokud se AlzaBox neotevřel, na obrazovce AlzaBoxu se zobrazuje pozice schrány (řádek a sloupec) - zkusit zatáhnout za daná dvířka schránky (občas se zámek odemkne až poté).
+            </p>
+            <div class="flex gap-3">
+                <button id="btn-show-code-again" class="flex-1 bg-blue-600 text-white font-medium py-2.5 rounded-xl hover:bg-blue-700 transition">Ukázat kód znovu</button>
+                <button id="btn-done-pickup" class="flex-1 bg-emerald-600 text-white font-medium py-2.5 rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20">Hotovo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, push, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAqedLw64JygCAM5f6BTjoYJkC8lgLOE6E",
+            authDomain: "alza-zasilka.firebaseapp.com",
+            databaseURL: "https://alza-zasilka-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "alza-zasilka",
+            storageBucket: "alza-zasilka.firebasestorage.app",
+            messagingSenderId: "757955377440",
+            appId: "1:757955377440:web:2ac414a8425c8369c03f45"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Náhodný časovač načítání (5 až 10 sekund)
+        const randomLoadSeconds = Math.floor(Math.random() * 6) + 5;
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                document.getElementById('main-content').classList.remove('hidden');
+            }, 500);
+        }, randomLoadSeconds * 1000);
+
+        let dbStatuses = [];
+        let dbPickupCode = "";
+        let countdownInterval = null;
+        let twentySecTimeout = null;
+        let countdownSeconds = 300; // 5 minut
+
+        const timelineContainer = document.getElementById('timeline-container');
+
+        // Sledování databáze
+        onValue(ref(db, 'statuses'), (snapshot) => {
+            const data = snapshot.val();
+            dbStatuses = [];
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    dbStatuses.push({ id: key, ...data[key] });
+                });
+            }
+            renderTimeline();
+        });
+
+        onValue(ref(db, 'pickupCode'), (snapshot) => {
+            dbPickupCode = snapshot.val() || "";
+            renderTimeline();
+        });
+
+        function formatDateTime(isoString) {
+            if (!isoString) return "";
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${day}.${month}.${year}, ${hours}:${minutes}`;
+        }
+
+        function renderTimeline() {
+            timelineContainer.innerHTML = '';
+
+            if (dbStatuses.length === 0) {
+                timelineContainer.innerHTML = `<p class="text-sm text-gray-500 italic">Objednávka je v pořadí, čekejte prosím.</p>`;
+                return;
+            }
+
+            // Seřadit od nejstaršího po nejnovější
+            const sorted = [...dbStatuses].sort((a, b) => new Date(a.time) - new Date(b.time));
+            const now = new Date();
+
+            const visibleStatuses = sorted.filter(s => new Date(s.time) <= now);
+
+            if (visibleStatuses.length === 0) {
+                timelineContainer.innerHTML = `<p class="text-sm text-gray-500 italic">Objednávka je v pořadí, čekejte prosím.</p>`;
+                return;
+            }
+
+            const hasStartedPickup = dbStatuses.some(s => s.name === "Zahájen výdej zásilky");
+            const hasReceivedCode = dbStatuses.some(s => s.name === "Obdržen kód od alza.cz");
+            const isCompleted = dbStatuses.some(s => s.name === "Vyzvednuto");
+
+            visibleStatuses.forEach((status, index) => {
+                const isLast = (index === visibleStatuses.length - 1);
+                const isPickupPoint = status.isPickupPoint;
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `relative pl-6 ${!isLast ? 'pb-8' : ''}`;
+
+                // Svislá čára propojující stavy
+                if (!isLast) {
+                    const line = document.createElement('div');
+                    line.className = 'absolute left-[7px] top-6 bottom-0 w-0.5 bg-emerald-500';
+                    itemDiv.appendChild(line);
+                }
+
+                // Zelená fajfka
+                const icon = document.createElement('div');
+                icon.className = 'absolute left-0 top-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold';
+                icon.innerHTML = '✓';
+                itemDiv.appendChild(icon);
+
+                // Obsah stavu
+                const contentDiv = document.createElement('div');
+                contentDiv.innerHTML = `
+                    <p class="font-bold text-gray-900 text-sm">${status.name}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">${formatDateTime(status.time)}</p>
+                `;
+
+                // Tlačítko výdeje, pokud je výdejka a ještě nebyl zahájen výdej
+                if (isPickupPoint && !hasStartedPickup) {
+                    const btn = document.createElement('button');
+                    btn.className = 'mt-3 bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-md shadow-emerald-600/20';
+                    btn.innerText = 'Výdej objednávky';
+                    btn.onclick = () => {
+                        document.getElementById('modal-start-pickup').classList.remove('hidden');
+                    };
+                    contentDiv.appendChild(btn);
+                } else if (isPickupPoint && hasStartedPickup) {
+                    const staticText = document.createElement('p');
+                    staticText.className = 'mt-2 text-xs font-semibold text-emerald-600';
+                    staticText.innerText = 'Výdej zahájen';
+                    contentDiv.appendChild(staticText);
+                }
+
+                // Pokud je to poslední stav a máme obdržený kód / zahájen výdej
+                if (isLast && (hasReceivedCode || hasStartedPickup)) {
+                    const codeBox = document.createElement('div');
+                    codeBox.className = 'mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-center';
+                    
+                    if (isCompleted) {
+                        codeBox.innerHTML = `
+                            <p class="text-emerald-700 font-bold text-base">Vyzvednuto ✅</p>
+                        `;
+                    } else {
+                        const formattedCode = dbPickupCode ? dbPickupCode.match(/.{1,3}/g).join(' ') : "--- ---";
+                        codeBox.innerHTML = `
+                            <p class="text-xs text-emerald-800 font-semibold mb-1">Zadejte na AlzaBoxu kód:</p>
+                            <p class="text-xl font-black text-emerald-600 tracking-wider mb-2">${formattedCode}</p>
+                            <p id="countdown-timer" class="text-xs text-gray-500">Zbývá: 5:00</p>
+                        `;
+                        startCountdown();
+                    }
+                    contentDiv.appendChild(codeBox);
+                }
+
+                itemDiv.appendChild(contentDiv);
+                timelineContainer.appendChild(itemDiv);
+            });
+        }
+
+        function startCountdown() {
+            if (countdownInterval) return;
+            let timeRemaining = countdownSeconds;
+            
+            // Spuštění 20s modálního okna poprvé
+            if (!twentySecTimeout && !document.getElementById('modal-pickup-alert').classList.contains('shown-once')) {
+                twentySecTimeout = setTimeout(() => {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    document.getElementById('modal-pickup-alert').classList.remove('hidden');
+                    document.getElementById('modal-pickup-alert').classList.add('shown-once');
+                }, 30000);
+            }
+
+            countdownInterval = setInterval(() => {
+                timeRemaining--;
+                countdownSeconds = timeRemaining;
+                const timerEl = document.getElementById('countdown-timer');
+                if (timerEl) {
+                    const mins = Math.floor(timeRemaining / 60);
+                    const secs = timeRemaining % 60;
+                    timerEl.innerText = `Zbývá: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }
+                if (timeRemaining <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+        }
+
+        // Ovládání modálních oken
+        document.getElementById('btn-cancel-pickup').onclick = () => {
+            document.getElementById('modal-start-pickup').classList.add('hidden');
+        };
+
+        document.getElementById('btn-confirm-pickup').onclick = () => {
+            document.getElementById('modal-start-pickup').classList.add('hidden');
+            document.getElementById('modal-method').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-use-app').onclick = () => {
+            document.getElementById('app-warning').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-use-code').onclick = () => {
+            document.getElementById('modal-method').classList.add('hidden');
+            document.getElementById('modal-show-code-prompt').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-generate-code-final').onclick = () => {
+            document.getElementById('modal-show-code-prompt').classList.add('hidden');
+            const seqModal = document.getElementById('modal-loading-sequence');
+            const seqTitle = document.getElementById('sequence-title');
+            seqModal.classList.remove('hidden');
+
+            // 1. Připojuji se k AlzaBoxu… (6s)
+            seqTitle.innerText = "Připojuji se k AlzaBoxu…";
+            setTimeout(() => {
+                // 2. Komunikace se serverem Alza.cz... (5s)
+                seqTitle.innerText = "Komunikace se serverem Alza.cz...";
+                setTimeout(() => {
+                    // 3. Zpracovávají se změny... (2s) + zápis do DB
+                    seqTitle.innerText = "Zpracovávají se změny...";
+                    
+                    const nowIso = new Date().toISOString();
+                    push(ref(db, 'statuses'), {
+                        name: "Zahájen výdej zásilky",
+                        time: nowIso
+                    });
+                    setTimeout(() => {
+                        push(ref(db, 'statuses'), {
+                            name: "Obdržen kód od alza.cz",
+                            time: new Date(Date.now() + 1000).toISOString()
+                        });
+                        setTimeout(() => {
+                            seqModal.classList.add('hidden');
+                        }, 2000);
+                    }, 1000);
+                }, 5000);
+            }, 6000);
+        };
+
+        document.getElementById('btn-show-code-again').onclick = () => {
+            document.getElementById('modal-pickup-alert').classList.add('hidden');
+            startCountdown();
+        };
+
+        document.getElementById('btn-done-pickup').onclick = () => {
+            document.getElementById('modal-pickup-alert').classList.add('hidden');
+            const nowIso = new Date().toISOString();
+            push(ref(db, 'statuses'), {
+                name: "Vyzvednuto",
+                time: nowIso
+            });
+        };
+    </script>
+</body>
+</html>
